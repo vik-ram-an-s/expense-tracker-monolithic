@@ -414,17 +414,45 @@ public class BudgetService {
         return result;
     }
 
-    public BudgetResponseDto addCategoryBudget(Long budgetId,CategoryBudgetDto categoryBudgetDto) {
-        Budget existingBudget = budgetRepository.findById(budgetId).orElseThrow(()->new RuntimeException("Budget Not found with given id"));
+    @Transactional
+    public BudgetResponseDto addCategoryBudget(Long budgetId, CategoryBudgetDto categoryBudgetDto) {
+
+        Budget existingBudget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new RuntimeException("Budget not found"));
+
         Category category = categoryService.getCategoryEntity(categoryBudgetDto.getCategoryId());
-        CategoryBudget categoryBudget= new CategoryBudget();
-        categoryBudget.setLimitAmount(categoryBudgetDto.getLimitAmount());
-        categoryBudget.setId(categoryBudgetDto.getCategoryId());
-        categoryBudget.setCategory(category);
-        existingBudget.getCategoryBudgets().add(categoryBudget);
 
-        budgetRepository.save(existingBudget);
-        return mapToResponse(existingBudget);
+        // 🔥 Ensure list is initialized
+        if (existingBudget.getCategoryBudgets() == null) {
+            existingBudget.setCategoryBudgets(new ArrayList<>());
+        }
 
+        // 🔥 Check if category already exists
+        Optional<CategoryBudget> existingCategoryBudget = existingBudget.getCategoryBudgets()
+                .stream()
+                .filter(cb -> cb.getCategory().getId().equals(category.getId()))
+                .findFirst();
+
+        if (existingCategoryBudget.isPresent()) {
+
+            // 👉 Option 1: Throw error
+             throw new RuntimeException("Category already exists in this budget");
+
+
+
+        } else {
+            // 👉 Add new category budget
+            CategoryBudget categoryBudget = new CategoryBudget();
+            categoryBudget.setLimitAmount(categoryBudgetDto.getLimitAmount());
+            categoryBudget.setCategory(category);
+            categoryBudget.setBudget(existingBudget);
+
+            existingBudget.getCategoryBudgets().add(categoryBudget);
+        }
+
+        Budget saved = budgetRepository.save(existingBudget);
+        return mapToResponse(saved);
     }
+
+
 }
