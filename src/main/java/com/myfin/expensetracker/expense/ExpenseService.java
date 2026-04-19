@@ -42,6 +42,9 @@ public class ExpenseService {
 
     public BigDecimal getTotalExpense(Integer month, Integer year){
         BigDecimal totalExpense;
+
+
+
         if(!expenseRepository.existsByMonthAndYear(month,year)){
             totalExpense = BigDecimal.ZERO;
         }
@@ -201,7 +204,6 @@ public class ExpenseService {
         }
         else{
             expenseSummary = expenseRepository.getExpenseSummary();
-            System.out.println("inside the else block");
         }
 
 
@@ -268,4 +270,6 @@ public class ExpenseService {
         }
         return response;
     }
+
+
 }

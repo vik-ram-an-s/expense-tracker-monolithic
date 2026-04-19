@@ -133,28 +133,10 @@ public class BudgetService {
     public Budget getBudgetEntityByMonthAndYear(Integer month,Integer year){
         Budget budget;
 
-        if (month != null && year != null) {
-            // exact match
-            budget = budgetRepository.findByMonthAndYear(month, year)
+        MonthYearPair monthYearPair = resolveMonthYearPair(month,year);
+        budget = budgetRepository.findByMonthAndYear(monthYearPair.getMonth(), monthYearPair.getYear())
                     .orElseThrow(() -> new RuntimeException("Budget not found for given month and year"));
 
-        } else if (month != null) {
-            // assume current year
-            int currentYear = LocalDateTime.now().getYear();
-
-            budget = budgetRepository.findByMonthAndYear(month, currentYear)
-                    .orElseThrow(() -> new RuntimeException("Budget not found for the given month and year"));
-
-        } else if (year != null) {
-            throw new RuntimeException("Please provide month along with year");
-
-        } else {
-            // both null → current month
-            LocalDateTime now = LocalDateTime.now();
-
-            budget = budgetRepository.findByMonthAndYear(now.getMonthValue(), now.getYear())
-                    .orElseThrow(() -> new RuntimeException("Budget not found for the given month and year"));
-        }
         return budget;
     }
 
@@ -267,8 +249,12 @@ public class BudgetService {
         }
     }
 
+    public Budget getBudgetEntity(Long id){
+        return budgetRepository.findById(id).orElseThrow(()->new RuntimeException("Budget with "+id +" not found"));
+    }
+
     public BudgetResponseDto getBudgetById(Long id) {
-        Budget budget = budgetRepository.findById(id).orElseThrow(()->new RuntimeException("Budget with "+id +" not found"));
+        Budget budget = getBudgetEntity(id);
         return mapToResponse(budget);
     }
 
@@ -278,7 +264,10 @@ public class BudgetService {
         BudgetStatus status;
 
         totalBudget = getBudgetEntityByMonthAndYear(month,year).getTotalBudget();
-        totalExpense = expenseService.getTotalExpense(month,year);
+
+        MonthYearPair monthYearPair = resolveMonthYearPair(month,year);
+
+        totalExpense = expenseService.getTotalExpense(monthYearPair.getMonth(),monthYearPair.getYear());
 
         BudgetComputation budgetDetails = computeBudget(totalBudget,totalExpense);
 
@@ -307,7 +296,8 @@ public class BudgetService {
 
         List<CategoryUsageResponseDto> categoryUsageResponseDtoList = new ArrayList<>();
 
-        Map<Long,BigDecimal> categories = expenseService.getCategoryUsage(month,year);
+        MonthYearPair monthYearPair = resolveMonthYearPair(month,year);
+        Map<Long,BigDecimal> categories = expenseService.getCategoryUsage(monthYearPair.getMonth(),monthYearPair.getYear());
 
 
         for(CategoryBudget categoryBudget:categoryBudgets){
@@ -370,7 +360,7 @@ public class BudgetService {
         percentAndStatus.setPercent(percent);
 
         // 🔹 3. Determine status
-        BudgetStatus status;   
+        BudgetStatus status;
 
         if (remainingBudget.compareTo(BigDecimal.ZERO) < 0) {
             status = BudgetStatus.OVER_BUDGET;
@@ -433,6 +423,8 @@ public class BudgetService {
                 .filter(cb -> cb.getCategory().getId().equals(category.getId()))
                 .findFirst();
 
+
+
         if (existingCategoryBudget.isPresent()) {
 
             // 👉 Option 1: Throw error
@@ -441,18 +433,122 @@ public class BudgetService {
 
 
         } else {
-            // 👉 Add new category budget
-            CategoryBudget categoryBudget = new CategoryBudget();
-            categoryBudget.setLimitAmount(categoryBudgetDto.getLimitAmount());
-            categoryBudget.setCategory(category);
-            categoryBudget.setBudget(existingBudget);
+            BigDecimal budgetLimit = existingBudget.getTotalBudget();
+            BigDecimal totalCategoryLimit = existingBudget.getCategoryBudgets()
+                    .stream()
+                    .map(CategoryBudget::getLimitAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            existingBudget.getCategoryBudgets().add(categoryBudget);
+            BigDecimal updatedLimit = totalCategoryLimit.add(categoryBudgetDto.getLimitAmount());
+
+            // 👉 Add new category budget
+            if(budgetLimit.compareTo(updatedLimit)>=0){
+                CategoryBudget categoryBudget = new CategoryBudget();
+                categoryBudget.setLimitAmount(categoryBudgetDto.getLimitAmount());
+                categoryBudget.setCategory(category);
+                categoryBudget.setBudget(existingBudget);
+
+                existingBudget.getCategoryBudgets().add(categoryBudget);
+            }
+            else{
+                throw new RuntimeException("Budget Limit exceeds");
+            }
+
+
         }
 
         Budget saved = budgetRepository.save(existingBudget);
         return mapToResponse(saved);
     }
 
+    public MonthYearPair resolveMonthYearPair(Integer month,Integer year){
+        if (month != null && year != null) {
+            return new MonthYearPair(month, year);
 
+        } else if (month != null) {
+            int currentYear = LocalDateTime.now().getYear();
+            return new MonthYearPair(month, currentYear);
+
+        } else if (year != null) {
+            throw new RuntimeException("Please provide month along with year");
+
+        } else {
+            LocalDateTime now = LocalDateTime.now();
+            return new MonthYearPair(now.getMonthValue(), now.getYear());
+        }
+    }
+
+
+    public BudgetAlertDto getAlerts(Integer month, Integer year) {
+
+        BudgetAlertDto alertResponse = new BudgetAlertDto();
+
+
+            BudgetSummaryResponseDto summary = getSummaryByMonthAndYear(month,year);
+
+            CategoryUsageSummaryResponseDto categoryUsageSummaryResponseDto = getCategoryUsage(month,year);
+
+            if(categoryUsageSummaryResponseDto.getCategoryUsageResponseDtoList().isEmpty()){
+                alertResponse.setCategoryAlertDtoList(Collections.emptyList());
+            }
+
+            alertResponse.setCategoryAlertDtoList(new ArrayList<>());
+
+
+            for(CategoryUsageResponseDto dto:categoryUsageSummaryResponseDto.getCategoryUsageResponseDtoList()){
+
+
+//                 No need for alert if budget is safe
+                if (dto.getStatus() == BudgetStatus.SAFE) {
+                    continue;
+                }
+                else{
+                    CategoryAlertDto categoryAlertDto = new CategoryAlertDto();
+                    categoryAlertDto.setStatus(dto.getStatus());
+                    categoryAlertDto.setCategoryName(dto.getCategoryName());
+                    String message;
+
+                    if(dto.getStatus().equals(BudgetStatus.OVER_BUDGET)){
+                        categoryAlertDto.setMessage(dto.getCategoryName()+" budget exceeded");
+                    }
+                    else{
+                        categoryAlertDto.setMessage(dto.getCategoryName()+" budget above 80%");
+                    }
+                    alertResponse.getCategoryAlertDtoList().add(categoryAlertDto);
+                }
+
+            }
+
+
+            alertResponse.setOverAllStatus(summary.getStatus());
+            if (summary.getStatus() == BudgetStatus.WARNING) {
+                alertResponse.setMessage("Total budget exceeds 80%");
+            } else if (summary.getStatus() == BudgetStatus.OVER_BUDGET) {
+                alertResponse.setMessage("Total budget exceeded");
+            }
+
+//        }
+//        else if(month==null && year==null){
+
+//        }
+        return alertResponse;
+    }
+
+    @Transactional
+    public void deleteCategoryBudget(Long budgetId, Long categoryId) {
+
+        Budget budget = getBudgetEntity(budgetId);
+
+        List<CategoryBudget> categoryBudgets = budget.getCategoryBudgets();
+
+        boolean removed = categoryBudgets.removeIf(c -> Objects.equals(c.getCategory().getId(), categoryId));
+
+        if(!removed){
+            throw new RuntimeException("Category not found in the budget");
+        }
+
+        budgetRepository.save(budget);
+
+
+    }
 }

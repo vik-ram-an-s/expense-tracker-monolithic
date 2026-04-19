@@ -77,4 +77,18 @@ public class BudgetController {
         return ResponseEntity.ok(budgetService.getCategoryUsage(month,year));
     }
 
+    @DeleteMapping("/{budgetId}/categories/{categoryId}")
+    public ResponseEntity<Void> deleteCategoryBudget(
+            @PathVariable Long budgetId,
+            @PathVariable Long categoryId) {
+
+        budgetService.deleteCategoryBudget(budgetId, categoryId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<BudgetAlertDto> getAlerts(@RequestParam(required = false) Integer month, @RequestParam(required = false) Integer year ){
+        return ResponseEntity.ok(budgetService.getAlerts(month,year));
+    }
+
 }

@@ -67,4 +67,6 @@ public interface ExpenseRepository extends JpaRepository<Expense,Long> {
 
     @Query("select e.category.id, sum(e.amount) from Expense e where e.isDeleted=false and e.category.isDeleted=false and MONTH(e.expenseDate)=:month and YEAR(e.expenseDate)=:year group by e.category.id")
     List<Object[]> getCategoryUsage(Integer month, Integer year);
+
+
 }
