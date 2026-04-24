@@ -3,7 +3,7 @@ package com.myfin.expensetracker.budget;
 import com.myfin.expensetracker.category.Category;
 import com.myfin.expensetracker.category.CategoryService;
 import com.myfin.expensetracker.expense.ExpenseService;
-import jakarta.validation.Valid;
+import jakarta.annotation.Nonnull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,24 +43,23 @@ public class BudgetService {
         return response;
     }
 
+    public CategoryBudgetResponseDto mapToCategoryBudgetResponse(CategoryBudget categoryBudget) {
+
+        CategoryBudgetResponseDto response = new CategoryBudgetResponseDto();
+
+        CategoryResponse categoryResponse = new CategoryResponse();
+        categoryResponse.setName(categoryBudget.getCategory().getName());
+        categoryResponse.setId(categoryBudget.getCategory().getId());
+
+        response.setCategoryResponse(categoryResponse);
+        response.setId(categoryBudget.getId());
+        response.setLimitAmount(categoryBudget.getLimitAmount());
+
+        return response;
+    }
+
     public List<CategoryBudgetResponseDto> mapToCategoryBudgetResponse(List<CategoryBudget> categoryBudgets){
-        List<CategoryBudgetResponseDto> categoryBudgetResponseDtoList = new ArrayList<>();
-        for(CategoryBudget categoryBudget:categoryBudgets){
-            CategoryBudgetResponseDto response = new CategoryBudgetResponseDto();
-
-            // mapping category id and name to categoryResponseDto
-            CategoryResponse categoryResponse = new CategoryResponse();
-            categoryResponse.setName(categoryBudget.getCategory().getName());
-            categoryResponse.setId(categoryBudget.getCategory().getId());
-
-            // mapping categoryBudgetResponse
-            response.setCategoryResponse(categoryResponse);
-            response.setId(categoryBudget.getId());
-            response.setLimitAmount(categoryBudget.getLimitAmount());
-            categoryBudgetResponseDtoList.add(response);
-        }
-        return categoryBudgetResponseDtoList;
-
+        return categoryBudgets.stream().map(this::mapToCategoryBudgetResponse).toList();
     }
 
 
@@ -260,8 +259,7 @@ public class BudgetService {
 
     public BudgetSummaryResponseDto getSummaryByMonthAndYear(Integer month, Integer year) {
 
-        BigDecimal totalBudget,totalExpense,remainingBudget,overspent,percent;
-        BudgetStatus status;
+        BigDecimal totalBudget,totalExpense;
 
         totalBudget = getBudgetEntityByMonthAndYear(month,year).getTotalBudget();
 
@@ -503,17 +501,7 @@ public class BudgetService {
                     continue;
                 }
                 else{
-                    CategoryAlertDto categoryAlertDto = new CategoryAlertDto();
-                    categoryAlertDto.setStatus(dto.getStatus());
-                    categoryAlertDto.setCategoryName(dto.getCategoryName());
-                    String message;
-
-                    if(dto.getStatus().equals(BudgetStatus.OVER_BUDGET)){
-                        categoryAlertDto.setMessage(dto.getCategoryName()+" budget exceeded");
-                    }
-                    else{
-                        categoryAlertDto.setMessage(dto.getCategoryName()+" budget above 80%");
-                    }
+                    CategoryAlertDto categoryAlertDto = getCategoryAlertDto(dto);
                     alertResponse.getCategoryAlertDtoList().add(categoryAlertDto);
                 }
 
@@ -527,11 +515,23 @@ public class BudgetService {
                 alertResponse.setMessage("Total budget exceeded");
             }
 
-//        }
-//        else if(month==null && year==null){
-
-//        }
         return alertResponse;
+    }
+
+    @Nonnull
+    private static CategoryAlertDto getCategoryAlertDto(CategoryUsageResponseDto dto) {
+        CategoryAlertDto categoryAlertDto = new CategoryAlertDto();
+        categoryAlertDto.setStatus(dto.getStatus());
+        categoryAlertDto.setCategoryName(dto.getCategoryName());
+
+
+        if(dto.getStatus().equals(BudgetStatus.OVER_BUDGET)){
+            categoryAlertDto.setMessage(dto.getCategoryName()+" budget exceeded");
+        }
+        else{
+            categoryAlertDto.setMessage(dto.getCategoryName()+" budget above 80%");
+        }
+        return categoryAlertDto;
     }
 
     @Transactional
@@ -550,5 +550,45 @@ public class BudgetService {
         budgetRepository.save(budget);
 
 
+    }
+
+    @Transactional
+    public CategoryBudgetResponseDto updateCategoryBudget(
+            Long budgetId,
+            Long categoryId,
+            UpdateCategoryBudgetDto dto) {
+
+        Budget budget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new RuntimeException("Budget not found"));
+
+        CategoryBudget categoryBudget = budget.getCategoryBudgets()
+                .stream()
+                .filter(cb -> cb.getCategory().getId().equals(categoryId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Category not found in this budget"));
+
+        BigDecimal newLimit = dto.getLimitAmount();
+
+        if (newLimit == null || newLimit.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Invalid limit amount");
+        }
+
+        BigDecimal total = budget.getCategoryBudgets()
+                .stream()
+                .map(CategoryBudget::getLimitAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        total = total.subtract(categoryBudget.getLimitAmount())
+                .add(newLimit);
+
+        if (total.compareTo(budget.getTotalBudget()) > 0) {
+            throw new RuntimeException("Category limits exceed total budget");
+        }
+
+        categoryBudget.setLimitAmount(newLimit);
+
+        budgetRepository.save(budget);
+
+        return mapToCategoryBudgetResponse(categoryBudget);
     }
 }
