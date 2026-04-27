@@ -30,6 +30,20 @@ public class GlobalExceptionHandler {
                 .body("Invalid payment method. Allowed values: CASH, UPI, CREDIT_CARD, DEBIT_CARD, BANK_TRANSFER");
     }
 
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<String> userNotFound(HttpMessageNotReadableException ex) {
+
+        return ResponseEntity.badRequest()
+                .body("User Not Found");
+    }
+
+    @ExceptionHandler(InvalidPasswordException.class)
+    public ResponseEntity<String> invalidPassword(HttpMessageNotReadableException ex) {
+
+        return ResponseEntity.badRequest()
+                .body("Invalid credentials");
+    }
+
     // Handles bean validation errors (like @NotNull)
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, String>> handleConstraintViolationException(ConstraintViolationException ex) {
