@@ -20,6 +20,9 @@ public class ExpenseRequestDto {
     @Positive(message = "Amount cannot be negative")
     private BigDecimal amount;
 
+    @NotNull(message = "User id is required")
+    private Long userId;
+
     @NotNull(message = "Category is required")
     private Long categoryId;
 

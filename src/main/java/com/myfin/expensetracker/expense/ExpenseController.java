@@ -31,17 +31,17 @@ public class ExpenseController {
     public ResponseEntity<ExpenseResponseDto> updateExpense(
             @PathVariable Long id, @RequestBody @Valid ExpenseRequestDto expense) {
 
-        return ResponseEntity.ok(expenseService.updateExpense(id, expense));
+        return ResponseEntity.status(HttpStatus.OK).body(expenseService.updateExpense(id, expense));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ExpenseResponseDto> getExpense(@PathVariable Long id) {
-        return ResponseEntity.ok(expenseService.getExpense(id));
+    public ResponseEntity<ExpenseResponseDto> getExpense(@PathVariable Long id,@RequestParam Long userId) {
+        return ResponseEntity.ok(expenseService.getExpense(id,userId));
     }
 
     @GetMapping
-    public ResponseEntity<List<ExpenseResponseDto>> getAllExpense() {
-        return ResponseEntity.ok(expenseService.getAllExpense());
+    public ResponseEntity<List<ExpenseResponseDto>> getUserExpenses(@RequestParam Long userId) {
+        return ResponseEntity.ok(expenseService.getUserExpenses(userId));
     }
 
     @GetMapping("/category/{categoryId}")
@@ -73,14 +73,14 @@ public class ExpenseController {
 
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteExpense(@PathVariable Long id) {
-        expenseService.deleteExpense(id);
+    public ResponseEntity<Void> deleteExpense(@PathVariable Long id,@RequestParam Long userId) {
+        expenseService.deleteExpense(id,userId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> deleteAllExpense() {
-        expenseService.deleteAllExpense();
+    public ResponseEntity<Void> deleteAllExpense(@RequestParam Long userId) {
+        expenseService.deleteAllExpense(userId);
         return ResponseEntity.noContent().build();
     }
 

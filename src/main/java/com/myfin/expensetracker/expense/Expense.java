@@ -2,6 +2,7 @@ package com.myfin.expensetracker.expense;
 
 
 import com.myfin.expensetracker.category.Category;
+import com.myfin.expensetracker.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -40,9 +41,13 @@ public class Expense {
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id",nullable = false)
+    private User user;
+
     @CreationTimestamp
-    private LocalDateTime createdDateTime;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    private LocalDateTime updatedDateTime;
+    private LocalDateTime updatedAt;
 }

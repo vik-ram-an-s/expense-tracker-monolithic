@@ -1,7 +1,7 @@
 package com.myfin.expensetracker.user;
 
 import com.myfin.expensetracker.constants.AppConstants;
-import com.myfin.expensetracker.exception.InvalidPasswordException;
+import com.myfin.expensetracker.exception.InvalidCredentialsException;
 import com.myfin.expensetracker.exception.UserNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -59,12 +59,16 @@ public class UserService {
         return mapToResponse(savedUser);
     }
 
+    public User getUserEntity(Long userId){
+        return userRepository.findByIdAndIsActiveTrue(userId).orElseThrow(()->new InvalidCredentialsException(AppConstants.INVALID_CREDENTIALS));
+    }
+
     public LoginResponse userLogin(LoginRequest request) {
 
-        User existingUser = userRepository.findByMobile(request.getMobile().trim()).orElseThrow(()->new UserNotFoundException("User Not Found"));
+        User existingUser = userRepository.findByMobile(request.getMobile().trim()).orElseThrow(()->new InvalidCredentialsException(AppConstants.INVALID_CREDENTIALS));
 
         if(!passwordEncoder.matches(request.getPassword(),existingUser.getPassword())){
-            throw new InvalidPasswordException("Invalid credentials");
+            throw new InvalidCredentialsException(AppConstants.INVALID_CREDENTIALS);
         }
 
         String token = "vikraman";

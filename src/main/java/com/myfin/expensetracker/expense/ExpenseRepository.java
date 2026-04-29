@@ -18,14 +18,13 @@ import java.util.Optional;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense,Long> {
 
-    List<Expense> findByIsDeletedFalse();
+    List<Expense> findByUserIdAndIsDeletedFalse(Long userId);
 
     Optional<Expense> findByIdAndIsDeletedFalse(Long id);
 
     @Modifying
-    @Transactional
-    @Query("update Expense e set e.isDeleted=true where e.isDeleted=false")
-    int setIsDeletedFlagAsTrue();
+    @Query("update Expense e set e.isDeleted=true, e.updatedAt = CURRENT_TIMESTAMP where e.isDeleted=false and e.user.id=:userId")
+    int setIsDeletedFlagAsTrue(Long userId);
 
 
 
@@ -69,4 +68,5 @@ public interface ExpenseRepository extends JpaRepository<Expense,Long> {
     List<Object[]> getCategoryUsage(Integer month, Integer year);
 
 
+    Optional<Expense> findByIdAndUserId(Long id, Long userId);
 }

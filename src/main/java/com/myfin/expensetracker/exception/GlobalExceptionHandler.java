@@ -2,12 +2,14 @@ package com.myfin.expensetracker.exception;
 
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.*;
 
@@ -30,18 +32,15 @@ public class GlobalExceptionHandler {
                 .body("Invalid payment method. Allowed values: CASH, UPI, CREDIT_CARD, DEBIT_CARD, BANK_TRANSFER");
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<String> userNotFound(HttpMessageNotReadableException ex) {
 
-        return ResponseEntity.badRequest()
-                .body("User Not Found");
-    }
 
-    @ExceptionHandler(InvalidPasswordException.class)
-    public ResponseEntity<String> invalidPassword(HttpMessageNotReadableException ex) {
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ErrorResponse> invalidPassword(AppException ex) {
 
-        return ResponseEntity.badRequest()
-                .body("Invalid credentials");
+        ErrorResponse errorResponse = new ErrorResponse(ex.getStatus(),ex.getMessage(), LocalDateTime.now());
+
+        return ResponseEntity.status(ex.getStatus())
+                .body(errorResponse);
     }
 
     // Handles bean validation errors (like @NotNull)

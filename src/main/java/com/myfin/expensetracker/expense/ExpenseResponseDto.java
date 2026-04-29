@@ -1,6 +1,6 @@
 package com.myfin.expensetracker.expense;
 
-import com.myfin.expensetracker.category.CategoryResponseDto;
+
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -11,9 +11,11 @@ public class ExpenseResponseDto {
 
     private Long id;
 
+    private Long userId;
+
     private BigDecimal amount;
 
-    private CategoryResponseDto category;
+    private ExpenseCategoryResponse category;
 
     private PaymentMethod paymentMethod;
 
@@ -21,7 +23,4 @@ public class ExpenseResponseDto {
 
     private LocalDateTime expenseDate;
 
-    private LocalDateTime createdDateTime;
-
-    private LocalDateTime updatedDateTime;
 }
